@@ -1,12 +1,61 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>图片预览 - 全局滑动</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片预览器 - 支持跨分组滑动</title>
+    <link rel="stylesheet" href="image-preview.css">
+</head>
+<body>
+    <h1>图片预览器 - 支持跨分组滑动</h1>
+
+    <div class="demo-container">
+        <h2>分组 1 - 风景照片</h2>
+        <div class="image-group" data-group="landscape">
+            <img src="https://picsum.photos/300/200?random=1" alt="风景1" class="preview-trigger">
+            <img src="https://picsum.photos/300/200?random=2" alt="风景2" class="preview-trigger">
+            <img src="https://picsum.photos/300/200?random=3" alt="风景3" class="preview-trigger">
+        </div>
+
+        <h2>分组 2 - 城市建筑</h2>
+        <div class="image-group" data-group="city">
+            <img src="https://picsum.photos/300/200?random=4" alt="城市1" class="preview-trigger">
+            <img src="https://picsum.photos/300/200?random=5" alt="城市2" class="preview-trigger">
+            <img src="https://picsum.photos/300/200?random=6" alt="城市3" class="preview-trigger">
+        </div>
+
+        <h2>分组 3 - 自然景观</h2>
+        <div class="image-group" data-group="nature">
+            <img src="https://picsum.photos/300/200?random=7" alt="自然1" class="preview-trigger">
+            <img src="https://picsum.photos/300/200?random=8" alt="自然2" class="preview-trigger">
+            <img src="https://picsum.photos/300/200?random=9" alt="自然3" class="preview-trigger">
+        </div>
+    </div>
+
+    <div id="imagePreview" class="image-preview-modal">
+        <div class="preview-overlay"></div>
+        <div class="preview-container">
+            <button class="preview-close">&times;</button>
+            <button class="preview-prev">&lt;</button>
+            <button class="preview-next">&gt;</button>
+
+            <div class="preview-content">
+                <img id="previewImage" src="" alt="预览图片">
+                <div class="preview-info">
+                    <span id="imageCounter"></span>
+                    <span id="imageGroup"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="image-preview.js"></script>
+    <script>
+        // 初始化图片预览器，支持跨分组滑动
+        const preview = new ImagePreview({
+            crossGroup: true, // 启用跨分组滑动
+            showGroupInfo: true // 显示分组信息
+        });
+    </script>
+</body>
 </html>
