@@ -1,0 +1,190 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    padding: 20px;
+    background-color: #f5f5f5;
+}
+
+h1 {
+    text-align: center;
+    color: #333;
+    margin-bottom: 30px;
+}
+
+h2 {
+    color: #555;
+    margin: 20px 0 10px;
+}
+
+.demo-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.image-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 30px;
+}
+
+.image-group img {
+    cursor: pointer;
+    border-radius: 8px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.image-group img:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* 预览模态框样式 */
+.image-preview-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+}
+
+.image-preview-modal.active {
+    display: block;
+}
+
+.preview-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+}
+
+.preview-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.preview-content {
+    position: relative;
+    max-width: 90%;
+    max-height: 90%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#previewImage {
+    max-width: 100%;
+    max-height: 80vh;
+    object-fit: contain;
+    border-radius: 4px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.preview-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid white;
+    color: white;
+    font-size: 36px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s ease;
+    z-index: 10001;
+}
+
+.preview-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.preview-prev,
+.preview-next {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid white;
+    color: white;
+    font-size: 30px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    z-index: 10001;
+}
+
+.preview-prev {
+    left: 20px;
+}
+
+.preview-next {
+    right: 20px;
+}
+
+.preview-prev:hover,
+.preview-next:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.preview-info {
+    margin-top: 15px;
+    color: white;
+    font-size: 16px;
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+#imageCounter {
+    background: rgba(0, 0, 0, 0.5);
+    padding: 8px 15px;
+    border-radius: 20px;
+}
+
+#imageGroup {
+    background: rgba(59, 130, 246, 0.7);
+    padding: 8px 15px;
+    border-radius: 20px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .image-group img {
+        width: calc(50% - 5px);
+    }
+
+    .preview-prev,
+    .preview-next {
+        width: 40px;
+        height: 40px;
+        font-size: 24px;
+    }
+
+    .preview-close {
+        width: 40px;
+        height: 40px;
+        font-size: 28px;
+    }
+}
