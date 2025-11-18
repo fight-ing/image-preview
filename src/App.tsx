@@ -16,7 +16,6 @@ function App() {
   const [currentGlobalIndex, setCurrentGlobalIndex] = useState<number>(-1);
 
   const {
-    globalImageMap,
     totalImages,
     getImageByGlobalIndex,
     getGlobalIndex,
