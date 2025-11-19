@@ -7,8 +7,9 @@ import '../models/image_group_model.dart';
 /// 1. 显示分组图片，宽高比1:1
 /// 2. 支持左右滑动切换图片
 /// 3. 支持向前或向后切换分组
-/// 4. 显示分组标题与图片数量："正面1/3"
-/// 5. SegmentedControl样式，可点击切换分组，且同步滑动图片
+/// 4. 跨分组连续滑动：滑动到分组最后一张时自动切换到下一分组
+/// 5. 显示分组标题与图片数量："正面1/3"
+/// 6. SegmentedControl样式，可点击切换分组，且同步滑动图片
 class GroupedImagePreview extends StatefulWidget {
   /// 图片分组列表
   final List<ImageGroup> groups;
@@ -106,6 +107,54 @@ class _GroupedImagePreviewState extends State<GroupedImagePreview> {
     });
 
     widget.onImageChanged?.call(_currentGroupIndex, imageIndex);
+  }
+
+  /// 处理跨分组滑动
+  bool _handleCrossGroupSwipe(ScrollNotification notification) {
+    if (notification is ScrollEndNotification) {
+      final metrics = notification.metrics;
+      final currentGroup = widget.groups[_currentGroupIndex];
+
+      // 检测是否滑动到最后一张（向右滑）
+      if (_currentImageIndex == currentGroup.imageCount - 1 &&
+          metrics.pixels >= metrics.maxScrollExtent) {
+        // 如果不是最后一个分组，切换到下一个分组
+        if (_currentGroupIndex < widget.groups.length - 1) {
+          _switchToGroup(_currentGroupIndex + 1);
+          return true;
+        }
+      }
+
+      // 检测是否滑动到第一张（向左滑）
+      if (_currentImageIndex == 0 && metrics.pixels <= metrics.minScrollExtent) {
+        // 如果不是第一个分组，切换到上一个分组的最后一张
+        if (_currentGroupIndex > 0) {
+          final previousGroupIndex = _currentGroupIndex - 1;
+          final previousGroup = widget.groups[previousGroupIndex];
+
+          setState(() {
+            _currentGroupIndex = previousGroupIndex;
+            _currentImageIndex = previousGroup.imageCount - 1;
+          });
+
+          _pageController.animateToPage(
+            previousGroupIndex,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+
+          // 跳转到上一个分组的最后一张图片
+          Future.delayed(const Duration(milliseconds: 100), () {
+            _groupPageControllers[previousGroupIndex]?.jumpToPage(previousGroup.imageCount - 1);
+          });
+
+          widget.onGroupChanged?.call(previousGroupIndex, previousGroup.imageCount - 1);
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   /// 当分组页面改变时
@@ -211,17 +260,25 @@ class _GroupedImagePreviewState extends State<GroupedImagePreview> {
           );
         }
 
-        return PageView.builder(
-          controller: _groupPageControllers[groupIndex],
-          onPageChanged: (imageIndex) {
+        return NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
             if (groupIndex == _currentGroupIndex) {
-              _onImagePageChanged(imageIndex);
+              return _handleCrossGroupSwipe(notification);
             }
+            return false;
           },
-          itemCount: group.imageCount,
-          itemBuilder: (context, imageIndex) {
-            return _buildImageItem(group.images[imageIndex]);
-          },
+          child: PageView.builder(
+            controller: _groupPageControllers[groupIndex],
+            onPageChanged: (imageIndex) {
+              if (groupIndex == _currentGroupIndex) {
+                _onImagePageChanged(imageIndex);
+              }
+            },
+            itemCount: group.imageCount,
+            itemBuilder: (context, imageIndex) {
+              return _buildImageItem(group.images[imageIndex]);
+            },
+          ),
         );
       },
     );
