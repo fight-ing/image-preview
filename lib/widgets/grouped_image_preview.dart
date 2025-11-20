@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import '../models/image_group_model.dart';
 
-/// 图片分组预览组件
+/// 图片分组预览组件 - 重构版
 ///
-/// 功能：
-/// 1. 显示分组图片，宽高比1:1
-/// 2. 支持左右滑动切换图片
-/// 3. 支持向前或向后切换分组
-/// 4. 跨分组连续滑动：滑动到分组最后一张时自动切换到下一分组
-/// 5. 显示分组标题与图片数量："正面1/3"
-/// 6. SegmentedControl样式，可点击切换分组，且同步滑动图片
+/// 新架构：
+/// 1. 所有图片在一个连续的 PageView 中滚动（全局滚动视图）
+/// 2. 滑动图片时，自动更新分组选择器
+/// 3. 点击分组选择器时，跳转到该分组的第一张图片
+/// 4. 无边界问题，流畅滑动
 class GroupedImagePreview extends StatefulWidget {
   /// 图片分组列表
   final List<ImageGroup> groups;
@@ -47,132 +45,128 @@ class GroupedImagePreview extends StatefulWidget {
   State<GroupedImagePreview> createState() => _GroupedImagePreviewState();
 }
 
+/// 全局图片信息
+class _GlobalImageInfo {
+  final int globalIndex; // 全局索引
+  final int groupIndex; // 所属分组索引
+  final int localIndex; // 分组内索引
+  final String imagePath; // 图片路径
+
+  _GlobalImageInfo({
+    required this.globalIndex,
+    required this.groupIndex,
+    required this.localIndex,
+    required this.imagePath,
+  });
+}
+
 class _GroupedImagePreviewState extends State<GroupedImagePreview> {
   late PageController _pageController;
+  late List<_GlobalImageInfo> _globalImages;
+  late int _currentGlobalIndex;
   late int _currentGroupIndex;
-  late int _currentImageIndex;
-
-  // 用于存储每个分组的 PageController
-  late Map<int, PageController> _groupPageControllers;
+  late int _currentLocalIndex;
 
   @override
   void initState() {
     super.initState();
+
+    // 构建全局图片列表
+    _globalImages = _buildGlobalImageList();
+
+    // 计算初始全局索引
+    _currentGlobalIndex = _calculateInitialGlobalIndex();
     _currentGroupIndex = widget.initialGroupIndex;
-    _currentImageIndex = widget.initialImageIndex;
+    _currentLocalIndex = widget.initialImageIndex;
 
-    // 初始化分组页面控制器
-    _pageController = PageController(initialPage: _currentGroupIndex);
-
-    // 初始化每个分组的图片页面控制器
-    _groupPageControllers = {};
-    for (int i = 0; i < widget.groups.length; i++) {
-      _groupPageControllers[i] = PageController(
-        initialPage: i == _currentGroupIndex ? _currentImageIndex : 0,
-      );
-    }
+    // 初始化 PageController
+    _pageController = PageController(initialPage: _currentGlobalIndex);
   }
 
   @override
   void dispose() {
     _pageController.dispose();
-    for (var controller in _groupPageControllers.values) {
-      controller.dispose();
-    }
     super.dispose();
+  }
+
+  /// 构建全局图片列表（将所有分组的图片平铺）
+  List<_GlobalImageInfo> _buildGlobalImageList() {
+    final List<_GlobalImageInfo> result = [];
+    int globalIndex = 0;
+
+    for (int groupIndex = 0; groupIndex < widget.groups.length; groupIndex++) {
+      final group = widget.groups[groupIndex];
+      for (int localIndex = 0; localIndex < group.images.length; localIndex++) {
+        result.add(_GlobalImageInfo(
+          globalIndex: globalIndex,
+          groupIndex: groupIndex,
+          localIndex: localIndex,
+          imagePath: group.images[localIndex],
+        ));
+        globalIndex++;
+      }
+    }
+
+    return result;
+  }
+
+  /// 计算初始全局索引
+  int _calculateInitialGlobalIndex() {
+    int globalIndex = 0;
+    for (int i = 0; i < widget.initialGroupIndex; i++) {
+      globalIndex += widget.groups[i].imageCount;
+    }
+    globalIndex += widget.initialImageIndex;
+    return globalIndex;
+  }
+
+  /// 获取分组的起始全局索引
+  int _getGroupStartIndex(int groupIndex) {
+    int startIndex = 0;
+    for (int i = 0; i < groupIndex; i++) {
+      startIndex += widget.groups[i].imageCount;
+    }
+    return startIndex;
+  }
+
+  /// 处理页面变化
+  void _onPageChanged(int globalIndex) {
+    if (globalIndex < 0 || globalIndex >= _globalImages.length) return;
+
+    final imageInfo = _globalImages[globalIndex];
+    final oldGroupIndex = _currentGroupIndex;
+
+    setState(() {
+      _currentGlobalIndex = globalIndex;
+      _currentGroupIndex = imageInfo.groupIndex;
+      _currentLocalIndex = imageInfo.localIndex;
+    });
+
+    // 回调
+    widget.onImageChanged?.call(imageInfo.groupIndex, imageInfo.localIndex);
+
+    // 如果分组变化了，触发分组切换回调
+    if (imageInfo.groupIndex != oldGroupIndex) {
+      widget.onGroupChanged?.call(imageInfo.groupIndex, imageInfo.localIndex);
+    }
   }
 
   /// 切换到指定分组
   void _switchToGroup(int groupIndex) {
-    if (groupIndex == _currentGroupIndex) return;
+    if (groupIndex < 0 || groupIndex >= widget.groups.length) return;
 
-    setState(() {
-      _currentGroupIndex = groupIndex;
-      _currentImageIndex = 0;
-    });
+    final startIndex = _getGroupStartIndex(groupIndex);
 
     _pageController.animateToPage(
-      groupIndex,
+      startIndex,
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
     );
-
-    widget.onGroupChanged?.call(groupIndex, 0);
-  }
-
-  /// 当前分组的图片切换
-  void _onImagePageChanged(int imageIndex) {
-    setState(() {
-      _currentImageIndex = imageIndex;
-    });
-
-    widget.onImageChanged?.call(_currentGroupIndex, imageIndex);
-  }
-
-  /// 处理跨分组滑动
-  bool _handleCrossGroupSwipe(ScrollNotification notification) {
-    if (notification is ScrollEndNotification) {
-      final metrics = notification.metrics;
-      final currentGroup = widget.groups[_currentGroupIndex];
-
-      // 检测是否滑动到最后一张（向右滑）
-      if (_currentImageIndex == currentGroup.imageCount - 1 &&
-          metrics.pixels >= metrics.maxScrollExtent) {
-        // 如果不是最后一个分组，切换到下一个分组
-        if (_currentGroupIndex < widget.groups.length - 1) {
-          _switchToGroup(_currentGroupIndex + 1);
-          return true;
-        }
-      }
-
-      // 检测是否滑动到第一张（向左滑）
-      if (_currentImageIndex == 0 && metrics.pixels <= metrics.minScrollExtent) {
-        // 如果不是第一个分组，切换到上一个分组的最后一张
-        if (_currentGroupIndex > 0) {
-          final previousGroupIndex = _currentGroupIndex - 1;
-          final previousGroup = widget.groups[previousGroupIndex];
-
-          setState(() {
-            _currentGroupIndex = previousGroupIndex;
-            _currentImageIndex = previousGroup.imageCount - 1;
-          });
-
-          _pageController.animateToPage(
-            previousGroupIndex,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-          );
-
-          // 跳转到上一个分组的最后一张图片
-          Future.delayed(const Duration(milliseconds: 100), () {
-            _groupPageControllers[previousGroupIndex]?.jumpToPage(previousGroup.imageCount - 1);
-          });
-
-          widget.onGroupChanged?.call(previousGroupIndex, previousGroup.imageCount - 1);
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
-  /// 当分组页面改变时
-  void _onGroupPageChanged(int groupIndex) {
-    final controller = _groupPageControllers[groupIndex];
-    final imageIndex = controller?.page?.round() ?? 0;
-
-    setState(() {
-      _currentGroupIndex = groupIndex;
-      _currentImageIndex = imageIndex;
-    });
-
-    widget.onGroupChanged?.call(groupIndex, imageIndex);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (widget.groups.isEmpty) {
+    if (widget.groups.isEmpty || _globalImages.isEmpty) {
       return const Center(
         child: Text('暂无图片'),
       );
@@ -184,9 +178,9 @@ class _GroupedImagePreviewState extends State<GroupedImagePreview> {
         _buildGroupSelector(),
         const SizedBox(height: 16),
 
-        // 图片预览区域
+        // 图片预览区域（单一 PageView）
         Expanded(
-          child: _buildImagePreview(),
+          child: _buildImagePageView(),
         ),
       ],
     );
@@ -205,7 +199,9 @@ class _GroupedImagePreviewState extends State<GroupedImagePreview> {
         children: List.generate(widget.groups.length, (index) {
           final group = widget.groups[index];
           final isSelected = index == _currentGroupIndex;
-          final imageIndex = index == _currentGroupIndex ? _currentImageIndex : 0;
+
+          // 计算当前分组内的图片索引（用于显示）
+          final displayIndex = isSelected ? _currentLocalIndex : 0;
           final totalImages = group.imageCount;
 
           return Expanded(
@@ -229,7 +225,7 @@ class _GroupedImagePreviewState extends State<GroupedImagePreview> {
                 ),
                 child: Center(
                   child: Text(
-                    '${ group.name}${imageIndex + 1}/$totalImages',
+                    '${group.name}${displayIndex + 1}/$totalImages',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
@@ -245,41 +241,15 @@ class _GroupedImagePreviewState extends State<GroupedImagePreview> {
     );
   }
 
-  /// 构建图片预览区域
-  Widget _buildImagePreview() {
+  /// 构建图片 PageView（单一连续滚动视图）
+  Widget _buildImagePageView() {
     return PageView.builder(
       controller: _pageController,
-      onPageChanged: _onGroupPageChanged,
-      itemCount: widget.groups.length,
-      itemBuilder: (context, groupIndex) {
-        final group = widget.groups[groupIndex];
-
-        if (group.isEmpty) {
-          return const Center(
-            child: Text('该分组暂无图片'),
-          );
-        }
-
-        return NotificationListener<ScrollNotification>(
-          onNotification: (notification) {
-            if (groupIndex == _currentGroupIndex) {
-              return _handleCrossGroupSwipe(notification);
-            }
-            return false;
-          },
-          child: PageView.builder(
-            controller: _groupPageControllers[groupIndex],
-            onPageChanged: (imageIndex) {
-              if (groupIndex == _currentGroupIndex) {
-                _onImagePageChanged(imageIndex);
-              }
-            },
-            itemCount: group.imageCount,
-            itemBuilder: (context, imageIndex) {
-              return _buildImageItem(group.images[imageIndex]);
-            },
-          ),
-        );
+      onPageChanged: _onPageChanged,
+      itemCount: _globalImages.length,
+      itemBuilder: (context, index) {
+        final imageInfo = _globalImages[index];
+        return _buildImageItem(imageInfo.imagePath);
       },
     );
   }
